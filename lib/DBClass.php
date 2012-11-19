@@ -8,6 +8,9 @@
    * 2011-05-27
    * usurped and modified by the WYCYDW framework (ACE)
    * 
+   * 2012-09-23
+   * Updated to be more database agnostic at least allow for mysqli, postgres, oracle, and mssql
+   * 
    * Copyright (C) 2011  Asif Chowdhury
    * 
    * This program is free software: you can redistribute it and/or modify
@@ -29,6 +32,8 @@ class DBClass {
   private $DBPassword;
   private $DBDatabase;
   private $DBConnection;
+  private $DBType;
+  private $oOracleResVal	= null;
   
   // added properties
   private $DBError = null;
@@ -44,18 +49,44 @@ class DBClass {
   public function __construct($dbInfo) {
     $this->DBHost = $dbInfo['database_host'];
     $this->DBUser = $dbInfo['database_username'];
-    $this->DBPassword = $dbInfo['database_password'];
-    $this->DBDatabase = $dbInfo['database_name'];
-    $this->DBConnection = @mysql_connect($dbInfo['database_host'], $dbInfo['database_username'], $dbInfo['database_password']);
-    
-    if (! $this->DBConnection) {
-      print "DBError: Could not connect to DB Server\n" . mysql_error();
-      exit;
-    }
+    $this->DBPassword	= $dbInfo['database_password'];
+    $this->DBDatabase	= $dbInfo['database_name'];
+    $this->DBType	= ((isset($dbInfo['database_type']) and !empty($dbInfo['database_type'])) ? $dbInfo['database_type'] : 'mysql');
+    $this->DBPort	= ((isset($dbInfo['database_port']) and !empty($dbInfo['database_port']) and is_numeric($dbInfo['database_port'])) ? $dbInfo['database_port'] : 3306);
 
-    if (! mysql_select_db($dbInfo['database_name'], $this->DBConnection)) {
-      print "DBError: Could not assign database\n";
-      exit;      
+    switch($this->DBType) {
+	case 'mssql':
+	    $this->DBConnection	= @mssql_connect();
+	    if (! $this->DBConnection) {
+	      print "DBError: Could not connect to DB Server\n";
+	      exit;
+	    }
+	    mssql_select_db($this->DBDatabase, $this->DBConnection);
+	    break;
+	case 'oracle':
+	    $this->DBConnection	= @oci_connect($this->$DBUser, $this->DBPassword, "//{$this->DBHost}:{$this->DBPort}/{$this->DBDatabase}");
+	    if (! $this->DBConnection) {
+	      print "DBError: Could not connect to DB Server: " . oci_error() . "\n";
+	      exit;
+	    }
+	    break;
+	case 'postgres':
+	    $this->DBConncetion	= @pg_connect("host={$this->DBHost} port={$this->DBPort} dbname={$this->DBDatabse} user={$this->DBUser} password={$this->DBPassword}");
+	    if (! $this->DBConnection) {
+	      print "DBError: Could not connect to DB Server\n";
+	      exit;
+	    }
+	    break;
+	case 'mysql':
+	    // mysql will now always use mysqli
+	case 'mysqli':
+	default:
+	    $this->DBConnection	=  mysqli_connect($this->DBHost, $this->DBUser, $this->DBPassword, $this->DBDatabase, $this->DBPort);
+	    if (!$this->DBConnection) {
+		print "DBError: Could not connect to DB Server: " . mysqli_connect_error() . "\n";
+		exit;
+	    }
+	    break;
     }
   }
    
@@ -143,15 +174,39 @@ class DBClass {
    * conntectDB - outputs a DB connection; used to connect to a database
    */
   public function connectDB() {
-    $this->DBConnection = @mysql_connect($this->DBHost, $this->DBUsername, $this->DBPassword);
-    if (! $this->DBConnection) {
-      print "DBError: Cannot connect to the database server\n";
-      exit;
-    }
-
-    if (! mysql_select_db($this->DBdatabase, $this->DBConnection)) {
-      print "DBError: Cannot assign database\n";
-      exit;
+    switch($this->DBType) {
+	case 'mssql':
+	    $this->DBConnection	= @mssql_connect();
+	    if (! $this->DBConnection) {
+	      print "DBError: Could not connect to DB Server\n";
+	      exit;
+	    }
+	    mssql_select_db($this->DBDatabase, $this->DBConnection);
+	    break;
+	case 'oracle':
+	    $this->DBConnection	= @oci_connect($this->$DBUser, $this->DBPassword, "//{$this->DBHost}:{$this->DBPort}/{$this->DBDatabase}");
+	    if (! $this->DBConnection) {
+	      print "DBError: Could not connect to DB Server: " . oci_error() . "\n";
+	      exit;
+	    }
+	    break;
+	case 'postgres':
+	    $this->DBConncetion	= @pg_connect("host={$this->DBHost} port={$this->DBPort} dbname={$this->DBDatabse} user={$this->DBUser} password={$this->DBPassword}");
+	    if (! $this->DBConnection) {
+	      print "DBError: Could not connect to DB Server\n";
+	      exit;
+	    }
+	    break;
+	case 'mysql':
+	    // mysql will now always use mysqli
+	case 'mysqli':
+	default:
+	    $this->DBConnection	=  mysqli_connect($this->DBHost, $this->DBUser, $this->DBPassword, $this->DBDatabase, $this->DBPort);
+	    if (!$this->DBConnection) {
+		print "DBError: Could not connect to DB Server: " . mysqli_connect_error() . "\n";
+		exit;
+	    }
+	    break;
     }
   }
   
@@ -161,34 +216,34 @@ class DBClass {
    * @parameter ($nRowsPerPage) as the number of rows to select for the limit
    * @parameter ($nPage) as the starting page for the limit 
    * @parameter ($updateAffectedRows) boolean as to whether we should set the affectedRows variable
-   * @return a database query resource (result)
+   * @return a database query resource (result) or false on failure
    */
-  public function dbExec($sSQL, $nRowsPerPage = 0, $nPage = 0, $UpdateAffectedRows=true) {
-    if(preg_match("%^select%i", $sSQL) and (! preg_match("%limit%i", $sSQL)) and ($nRowsPerPage != 0) and ($nPage != 0)) {
-      $sSQL .= " LIMIT " . ($nRowsPerPage * ($nPage - 1)) . ", " . $nRowsPerPage;
-    }
-
-    // grab the results
-    $rs = mysql_query($sSQL, $this->DBConnection);
-    $this->DBError = mysql_error();
-
-    // udpate the affected row
-    if ($UpdateAffectedRows) {
-      $this->DBAffectedRows  = mysql_affected_rows();
-    }
-
-    if (! $rs) {
-      print "DBError: There was a resource error: invalid resource {$this->DBError} in |$sSQL|\n";
-      exit;
-    }
-
-    // set the resource for this object
-    $this->DBResource = $rs;
-
-    // returns the resource
-    return $rs;
+  public function dbExec($sSQL, $nRowsPerPage = 0, $nPage = 0, $UpdateAffectedRows = true) {
+	$rs_result    = false;
+	switch($this->DBType) {
+		case 'mssql':
+			$rs_result	= mssql_query($sSQL, $this->DBConnection);
+			break;
+		case 'oracle':
+			$oci_std	= oci_parse($this->DBConnection, $sSQL);
+			$this->oOracleResVal		= OCINewDescriptor($this->DBConnection, OCI_D_LOB);
+			oci_bind_by_name($oci_std, ":res", $this->oOracleResVal, -1, OCI_B_CLOB);
+			$rs_result	= oci_execute($oci_std);
+			break;
+		case 'postgres':
+			$rs_result	= pg_query($sSQL, $this->DBConnection);
+			break;
+		case 'mysqli':
+		case 'mysql':
+		default:
+			$sSQL = mysqli_real_escape_string($this->DBConnection, $sSQL);
+			$rs_result	= mysqli_query($this->DBConnection, $sSQL);
+			break;
+	}
+	$this->DBResource	= $rs_result;
+	return $rs_result;
   }
-
+  
   /*
    * dbQuery - outputs a modified database; used to run an sql query
    * @parameter ($sql) - the sql query to run
@@ -210,14 +265,46 @@ class DBClass {
    * @return array   
    */
   public function dbDescribeTable($sTable) {
-    $rs = mysql_query("describe $sTable;");
-    $aReturn = array();
-    while($aRow	= mysql_fetch_assoc($rs)) {
-      array_push($aReturn, $aRow['Field']);
-    }
-    return $aReturn;
+      $aReturn	= array();
+      switch($this->DBType) {
+	  case 'mssql':
+	      $rs   = mssql_query($this->DBConnection, "SELECT * FROM information_schema.columns WHERE table_name = '{$sTable}' ORDER BY ordinal_position");
+	      while($aRow	= myssql_fetch_assoc($rs)) {
+		  array_push($aReturn, $aRow['Field']);
+	      }	      
+	      break;
+	  case 'oracle':
+	      $rs   = oci_parse($this->DBConnection, "DESCRIBE {$sTable}");
+	      while($aRow	= oci_fetch_assoc($rs)) {
+		  array_push($aReturn, $aRow['Field']);
+	      }	      
+	      break;
+	  case 'postgres':
+	      $rs   = pg_query($this->DBConnection, "\d+ {$sTable}");
+	      while($aRow	= pg_fetch_assoc($rs)) {
+		  array_push($aReturn, $aRow['Field']);
+	      }	      
+	      break;
+	  case 'mysql':
+	  case 'mysqli':
+	  default:
+	      $rs = mysqli_query($this->DBConnection, "DESCRIBE {$sTable}");
+	      while($aRow	= mysqli_fetch_assoc($rs)) {
+		  array_push($aReturn, $aRow['Field']);
+	      }
+	      break;      
+      }
+      return $aReturn;
   }
 
+  /**
+   * dbGetDBType    - gets the database type
+   * @return string
+   */
+  public function dbGetDBType() {
+      return $this->DBType;
+  }
+  
   /**
    * dbGetAllHash - outputs nothing; used to grab a list of hashes for a query
    * @parameter ($sSql) as the the sql query
@@ -235,8 +322,29 @@ class DBClass {
 
     // build the hash
     $resArray = array();
-    while ($row = mysql_fetch_assoc($rs)) {
-      array_push($resArray, $row);
+    switch($this->DBType) {
+	case 'mssql':
+	    while ($row = mssql_fetch_assoc($rs)) {
+	      array_push($resArray, $row);
+	    }	    
+	    break;
+	case 'oracle':
+	    while ($row = oci_fetch_assoc($rs)) {
+	      array_push($resArray, $row);
+	    }	    
+	    break;
+	case 'postgres':
+	    while ($row = pg_fetch_assoc($rs)) {
+	      array_push($resArray, $row);
+	    }
+	    break;
+	case 'mysql':
+	case 'mysqli':
+	default:
+	    while ($row = mysqli_fetch_assoc($rs)) {
+	      array_push($resArray, $row);
+	    }
+	    break;
     }
 
     // return the array
@@ -255,8 +363,29 @@ class DBClass {
 
     // build the hash
     $resArray = array();
-    while ($row = mysql_fetch_row($rs)) {
-      array_push($resArray, $row);
+    switch($this->DBType) {
+	case 'mssql':
+	    while ($row = mssql_fetch_row($rs)) {
+	      array_push($resArray, $row);
+	    }	    
+	    break;
+	case 'oracle':
+	    while ($row = oci_fetch_row($rs)) {
+	      array_push($resArray, $row);
+	    }	    
+	    break;
+	case 'postgres':
+	    while ($row = pg_fetch_row($rs)) {
+	      array_push($resArray, $row);
+	    }
+	    break;
+	case 'mysql':
+	case 'mysqli':
+	default:
+	    while ($row = mysqli_fetch_row($rs)) {
+	      array_push($resArray, $row);
+	    }
+	    break;
     }
 
     // return the array
@@ -270,7 +399,26 @@ class DBClass {
    */
   public function dbGetRowList($sql) {
     $rs = $this->dbExec($sql);
-    return mysql_fetch_row($rs);
+    $a_row  = array();
+    
+    switch($this->DBType) {
+	case 'mssql':
+	    $a_row = mssql_fetch_row($rs);
+	    break;
+	case 'oracle':
+	    $a_row = oci_fetch_row($rs);
+	    break;
+	case 'postgres':
+	    $a_row = pg_fetch_row($rs);
+	    break;
+	case 'mysql':
+	case 'mysqli':
+	default:
+	    $a_row = mysqli_fetch_row($rs);
+	    break;
+    }
+
+    return $a_row;
 }
 
   /**
@@ -280,7 +428,26 @@ class DBClass {
    */
   public function dbGetRowHash($sql) {
     $rs = $this->dbExec($sql);
-    return mysql_fetch_assoc($rs);
+    $a_row  = array();
+    
+    switch($this->DBType) {
+	case 'mssql':
+	    $a_row = mssql_fetch_assoc($rs);
+	    break;
+	case 'oracle':
+	    $a_row = oci_fetch_assoc($rs);
+	    break;
+	case 'postgres':
+	    $a_row = pg_fetch_assoc($rs);
+	    break;
+	case 'mysql':
+	case 'mysqli':
+	default:
+	    $a_row = mysqli_fetch_assoc($rs);
+	    break;
+    }
+
+    return $a_row;
   }
 
   /*
@@ -290,8 +457,26 @@ class DBClass {
    */
   public function dbGetOne($sql) {
     $rs	= $this->dbExec($sql);
-    $resRow =  mysql_fetch_row($rs);
-    return $resRow[0];
+    $a_row  = array();
+    
+    switch($this->DBType) {
+	case 'mssql':
+	    $a_row = mssql_fetch_row($rs);
+	    break;
+	case 'oracle':
+	    $a_row = oci_fetch_row($rs);
+	    break;
+	case 'postgres':
+	    $a_row = pg_fetch_row($rs);
+	    break;
+	case 'mysql':
+	case 'mysqli':
+	default:
+	    $a_row = mysqli_fetch_row($rs);
+	    break;
+    }
+
+    return ((!empty($a_row)) ? $a_row[0] : false);
   }
  
   /**
@@ -300,7 +485,28 @@ class DBClass {
    * @return number
    */
   public function dbNumRows($rs) {
-    return mysql_num_rows($rs);
+    $n_num_rows   = 0;
+
+    switch($this->DBType) {
+	case 'mssql':
+	    $n_num_rows = mssql_num_rows($rs);
+	    break;
+	case 'oracle':
+	    while($row	= oci_fetch_row($rs)) {
+		$n_num_rows++;
+	    }
+	    break;
+	case 'postgres':
+	    $n_num_rows = pg_num_rows($rs);
+	    break;
+	case 'mysql':
+	case 'mysqli':
+	default:
+	    $n_num_rows = mysqli_num_rows($rs);
+	    break;
+    }
+      
+    return $n_num_rows;
   }
 
   /**
@@ -309,7 +515,28 @@ class DBClass {
    * @return number
    */
   public function dbGetNumRows() {
-    return mysql_num_rows($this->DBResource);
+    $n_num_rows   = 0;
+
+    switch($this->DBType) {
+	case 'mssql':
+	    $n_num_rows = mssql_num_rows($this->DBResource);
+	    break;
+	case 'oracle':
+	    while($row	= oci_fetch_row($rs)) {
+		$n_num_rows++;
+	    }
+	    break;
+	case 'postgres':
+	    $n_num_rows = pg_num_rows($this->DBResource);
+	    break;
+	case 'mysql':
+	case 'mysqli':
+	default:
+	    $n_num_rows = mysqli_num_rows($this->DBResource);
+	    break;
+    }
+      
+    return $n_num_rows;
   }
 
   /**
@@ -317,7 +544,26 @@ class DBClass {
    * @return a number
    */
   public function dbGetAffectedRows() {
-    return mysql_affected_rows($this->DBConnection);
+    $n_num_rows   = 0;
+
+    switch($this->DBType) {
+	case 'mssql':
+	    $n_num_rows = mssql_rows_affected($this->DBResource);
+	    break;
+	case 'oracle':	    
+	    $n_num_rows	= oci_num_rows($this->DBResource);
+	    break;
+	case 'postgres':
+	    $n_num_rows = pg_affected_rows($this->DBResource);
+	    break;
+	case 'mysql':
+	case 'mysqli':
+	default:
+	    $n_num_rows = mysqli_affected_rows($this->DBResource);
+	    break;
+    }
+      
+    return $n_num_rows;
   }
 
   /**
@@ -325,13 +571,33 @@ class DBClass {
    * @return list
    */
   public function dbGetTables() {
-    $sql = "show tables;";
-    $rs = $this->dbExec($sql);
-    $aTables = array();
-    while ($aRow = mysql_fetch_array($rs)) {
-      array_push($aTables, $aRow[0]);
-    }
-    return $aTables;
+      $a_tables	= array();
+      
+      switch($this->DBType) {
+	case 'mssql':
+	    $rs   = $this->dbExec("SELECT name FROM {$this->DBDatabase}..sysobjects WHERE xtype = 'U'");
+	    while ($aRow = mssql_fetch_row($rs)) {
+		array_push($a_tables, $aRow[0]);
+	    }
+	    break;
+	case 'oracle':
+	    $rs	= $this->dbExec("SELECT * FROM dict");
+	    while ($aRow = oci_fetch_row($rs)) {
+		array_push($a_tables, $aRow[0]);
+	    }
+	    break;
+	case 'postgres':
+	    $rs	= $this->dbExec("\d");
+	    break;
+	case 'mysql':
+	case 'mysqli':
+	default:
+	    $rs = $this->dbExec("show tables;");
+	    while ($aRow = mysql_fetch_array($rs)) {
+	      array_push($a_tables, $aRow[0]);
+	    }	    
+      }
+      return $a_tables;
   }
 
   /**
@@ -339,7 +605,25 @@ class DBClass {
    * @return number
    */
   public function dbGetInsertID() {
-    return mysql_insert_id($this->DBConnection);
+    $n_id   = false;
+    switch($this->DBType) {
+	case 'mssql':
+	    $n_id	= $this->dbGetOne("SELECT @@IDENTITY AS 'Identity'");
+	    break;
+	case 'oracle':	    
+	    echo "Cannot get an ID from an Oracle Insert!";
+	    break;
+	case 'postgres':
+	    $n_id	= $this->dbGetOne("SELECT LASTVAL()");
+	    break;
+	case 'mysql':
+	case 'mysqli':
+	default:
+	    $n_id = mysqli_insert_id($this->DBResource);
+	    break;
+    }
+      
+    return $n_num_rows;
   }
 
   /**
@@ -347,7 +631,27 @@ class DBClass {
    * @return string
    */
   public function dbGetError() {
-    return mysql_error($this->DBConnection);
+    $s_error   = '';
+
+    switch($this->DBType) {
+	case 'mssql':
+	    $s_error = mssql_get_last_message();
+	    break;
+	case 'oracle':
+	    $a_error	= oci_error($this->DBConnection);
+	    $s_error	= ((!empty($a_error) and isset($a_error['message'])));
+	    break;
+	case 'postgres':
+	    $n_num_rows = pg_result_error($this->DBResource);
+	    break;
+	case 'mysql':
+	case 'mysqli':
+	default:
+	    $n_num_rows = mysqli_error($this->DBResource);
+	    break;
+    }
+ 
+    return $s_error;
   }
 
   /**
