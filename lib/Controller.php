@@ -37,6 +37,10 @@ class Controller {
 	$this->oPage	= new Page($aConf);
 	$this->oLayout	= $this->createLayout('default_layout');
 	$this->aModels	= array();
+	if(isset($_POST))
+	{
+	    $this->post	= new Post();
+	}
     }
 
     /** ------ Accessors ------ **/
@@ -127,7 +131,7 @@ class Controller {
 	$slash	= DIRECTORY_SEPARATOR;
 	$sModelPath = $aInfo['baseDir'] . $slash . $aInfo['load_model_path'] . $slash;
 	if(file_exists($sModelPath . $sModel . '.php') and is_file($sModelPath . $sModel . '.php')) {
-	    include($sModelPath . $sModel . '.php');
+	    include_once($sModelPath . $sModel . '.php');
 	    $aClassPath	= preg_split('%[/\\\]%', $sModel);
 	    $nLastIndex	= count($aClassPath) - 1;
 	    $sClass = $aClassPath[$nLastIndex];

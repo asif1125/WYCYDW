@@ -173,7 +173,7 @@ class Model {
 	  $s_values .= ((!empty($s_values)) ? "', '" : '') . $s_value;
       }
       
-      $s_sql	= "INSERT INTO {$s_table} ({$s_columns} VALUES ('{$s_values}')";
+      $s_sql	= "INSERT INTO {$s_table} ({$s_columns}) VALUES ('{$s_values}')";
       $this->oDB->dbQuery($s_sql);
       return $this->oDB->dbGetInsertID();
   }
@@ -201,6 +201,13 @@ class Model {
    */
   public function get() {
       $s_join	= '';
+      
+      // if the from was never set, use the default base table
+      if(empty($this->sFrom))
+      {
+	  $this->sFrom	= $this->sBaseTable;
+      }
+      
       foreach($this->aJoins as $s_single_join) {
 	  $s_join .= $s_single_join;
       }
@@ -239,6 +246,36 @@ class Model {
 			((!empty($this->sOrderBy)) ? 'ORDER BY ' . $this->sOrderBy : '') . ' ' .
 			((!empty($this->sLimit)) ? 'LIMIT ' . $this->sLimit : '');
       return $s_sql;
+  }
+  
+  /**
+   * @access public
+   * quote - quote the sql value passed in
+   * @param $value
+   * @return string
+   */
+  public function quote($value) {
+      return $this->oDB->dbQuote($value);
+  }
+  
+  /**
+   * @access public
+   * get_table	- returns the table that this is associated with.
+   * @return type 
+   */
+  public function get_table()
+  {
+      return $this->sBaseTable;
+  }
+  
+  /**
+   * @access public
+   * get_error - get the error for the last call
+   * @return string 
+   */
+  public function get_error()
+  {
+      return $this->oDB->dbGetError();
   }
   
   /**
