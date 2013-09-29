@@ -201,6 +201,13 @@ class Model {
    */
   public function get() {
       $s_join	= '';
+      
+      // if the from was never set, use the default base table
+      if(empty($this->sFrom))
+      {
+	  $this->sFrom	= $this->sBaseTable;
+      }
+      
       foreach($this->aJoins as $s_single_join) {
 	  $s_join .= $s_single_join;
       }
@@ -259,6 +266,16 @@ class Model {
   public function get_table()
   {
       return $this->sBaseTable;
+  }
+  
+  /**
+   * @access public
+   * get_error - get the error for the last call
+   * @return string 
+   */
+  public function get_error()
+  {
+      return $this->oDB->dbGetError();
   }
   
   /**

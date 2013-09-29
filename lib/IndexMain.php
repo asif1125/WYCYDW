@@ -20,19 +20,24 @@
  * You should have received a copy of the GNU General Public License
  * along with this program.  If not, see <http://www.gnu.org/licenses/>.
  */
-include('./lib/ConfigReader.php');
-include('./lib/DBClass.php');
-include('./lib/Model.php');
-include('./lib/Template.php');
-include('./lib/Page.php');
-include('./lib/Controller.php');
+include_once('./lib/ConfigReader.php');
+include_once('./lib/DBClass.php');
+include_once('./lib/Model.php');
+include_once('./lib/Template.php');
+include_once('./lib/Page.php');
+include_once('./lib/Controller.php');
+include_once('./lib/Post.php');
 class Index {
     /**
      * constructor - starts the whole process of finding out what we've called and loading up the appropriate page.
      */
-    public function __construct() {
-	// we always start a session first
-	session_start();
+    public function __construct($argv) {
+	$bCLI    = ((php_sapi_name() === 'cli') or (is_array($argv) and !empty($argv)));
+	$nArgsCount = count($argv);
+	if(!$bCLI) {
+	    // we always start a session first
+	    session_start();
+	}
 	
 	// open up the configuration
 	$slash	    = DIRECTORY_SEPARATOR;
@@ -42,21 +47,32 @@ class Index {
 	$baseURL	= $aConf['baseURL'];
 
 	// find out what's being called.
-	$sHttp	    = ((array_key_exists('HTTPS', $_SERVER) and $_SERVER['HTTPS'] == 'https') ? 'https://' : 'http://');
-	$sServer    = $_SERVER['SERVER_NAME'];
-	$sRequest   = $_SERVER['REQUEST_URI'];
-	$sQuery	    = $_SERVER['QUERY_STRING'];
-
+	if(!$bCLI) {
+	    $sHttp	    = ((array_key_exists('HTTPS', $_SERVER) and $_SERVER['HTTPS'] == 'https') ? 'https://' : 'http://');
+	    $sServer    = $_SERVER['SERVER_NAME'];
+	    $sRequest   = $_SERVER['REQUEST_URI'];
+	    $sQuery	    = $_SERVER['QUERY_STRING'];
+	}
+	    
 	// load up any libraries called for in the configuration
 	if(array_key_exists('load_library_path', $aConf) and !empty($aConf['load_library_path'])) {
 	    $this->loadLibraries($baseDir . $aConf['load_library_path']);
 	}
 
-	// look at the request URI and grab the appropriate controller
-	$sCallingURL	= $sHttp . $sServer . $sRequest;
-	$sCallingURL	= str_replace($baseURL, '', $sCallingURL);
-	$sCallingURL	= preg_replace('%^/%', '', $sCallingURL);
-	$aPieces    = (!empty($sCallingURL))? explode('/', $sCallingURL) : array();
+	// grab the arguments from the URL or the command line. 
+	if(!$bCLI) {
+	    // look at the request URI and grab the appropriate controller
+	    $sCallingURL	= $sHttp . $sServer . $sRequest;
+	    $sCallingURL	= str_replace($baseURL, '', $sCallingURL);
+	    $sCallingURL	= preg_replace('%^/%', '', $sCallingURL);
+	    $aPieces    = (!empty($sCallingURL))? explode('/', $sCallingURL) : array();
+	}
+	elseif($nArgsCount >= 1) {
+	    $aPieces	= array_slice($argv, 1);
+	}
+	else {
+	    die("You are trying to run the application in CLI mode without a controller specified. No actions will take place.\n");
+	}
 
 	// go through each level and find the controller with the remaining pieces as parameters
 	$bFoundController   = false;
@@ -86,7 +102,7 @@ class Index {
 	$sClass	= ((empty($sClass)) ? 'Default_Controller' : $sClass);
 
 	// include the controller file and instantiate the specified controller
-	include($baseDir . $sPath);
+	include_once($baseDir . $sPath);
 	$oController	= null;
 	eval("\$oController = new $sClass" . "(\$aConf);");
 

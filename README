@@ -34,7 +34,8 @@ load models in the controller like so
 	$this->model('<model_name>');
 
 load views in the controller like so:
-	$this->view('<view_name>', $array_of_variables);
+	$this->view('<view_name>', <array_of_variables>, <boolean for return>, <array of layout variables>);
+	<array of variables>, <boolean for return>, <array or layout variables> are optional.
 
 load layouts
 	$this->layout('<layout_name>');
@@ -67,7 +68,14 @@ You're reading it, because I wanted to make the README a FAQ as well.
 
 "What damn server configuration do I need?"
 -------------------------------------------
-For now it's only Apache
+For now it's only Apache and PHP > 5.2
 Make sure that mod-rewrite is turned on
 and allow for 
 	AllowOverride All
+
+"What damn things have changed in this software?"
+-------------------------------------------------
+2013-03-16 - Added the ability to use command line arguments.
+2013-03-16 - Modified multiple database type support including MySQL, MSSQL, PostgresSQL, and Oracle
+2013-03-16 - fixed a few bugs including the MySQL vs MySQLi DB controls.
+ 

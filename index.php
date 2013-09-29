@@ -17,5 +17,10 @@
  * along with this program.  If not, see <http://www.gnu.org/licenses/>.
  */
     include('./lib/IndexMain.php');
-    $index	= new Index();
+    if(empty($argv))
+    {
+	$argv = array();
+    }
+
+    $index	= new Index($argv);
 ?>
