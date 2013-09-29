@@ -185,5 +185,27 @@ class Controller {
 	else
 	    echo $sReturn;
     }
+    
+    /**
+     * library	- load a library and return a library object
+     * @author Asif Chowdhury
+     * @date 2013-09-28
+     * 
+     * @param $libary
+     * @return lib object
+     */
+    public function library($library)
+    {
+	    $aInfo		= $this->getPage()->getConfigInfo();
+	    $slash		= DIRECTORY_SEPARATOR;
+	    $library_path	= $aInfo['baseDir'] . $slash . $aInfo['load_other_library_path'] . $slash;
+	    $lib		= null;
+	    if(is_file($library_path . $library . ".php"))
+	    {
+		    include($library_path . $library . ".php");
+		    $lib	= new $library();
+	    }
+	    return $lib;
+    }    
 }
 ?>

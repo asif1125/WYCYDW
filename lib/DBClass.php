@@ -213,12 +213,8 @@ class DBClass {
   /**
    * dbExec - outputs nothing; used to run an sql query
    * @parameter ($sSql) as the the sql query
-   * @parameter ($nRowsPerPage) as the number of rows to select for the limit
-   * @parameter ($nPage) as the starting page for the limit 
-   * @parameter ($updateAffectedRows) boolean as to whether we should set the affectedRows variable
-   * @return a database query resource (result) or false on failure
    */
-  public function dbExec($sSQL, $nRowsPerPage = 0, $nPage = 0, $UpdateAffectedRows = true) {
+  public function dbExec($sSQL) {
 	$rs_result    = false;
 	switch($this->DBType) {
 		case 'mssql':
@@ -236,7 +232,6 @@ class DBClass {
 		case 'mysqli':
 		case 'mysql':
 		default:
-			$sSQL = mysqli_real_escape_string($this->DBConnection, $sSQL);
 			$rs_result	= mysqli_query($this->DBConnection, $sSQL);
 			break;
 	}
@@ -250,8 +245,8 @@ class DBClass {
    * @return boolean
    */
   public function dbQuery($sql) {
-    $rs = $this->dbExec($sql, 0, 0, true);
-    if ($rs) {
+    $rs = $this->dbExec($sql);
+    if ($rs == true) {
       return true;
     }
     else {
@@ -593,7 +588,7 @@ class DBClass {
 	case 'mysqli':
 	default:
 	    $rs = $this->dbExec("show tables;");
-	    while ($aRow = mysql_fetch_array($rs)) {
+	    while ($aRow = mysqli_fetch_array($rs)) {
 	      array_push($a_tables, $aRow[0]);
 	    }	    
       }
@@ -619,11 +614,11 @@ class DBClass {
 	case 'mysql':
 	case 'mysqli':
 	default:
-	    $n_id = mysqli_insert_id($this->DBResource);
+	    $n_id = mysqli_insert_id($this->DBConnection);
 	    break;
     }
       
-    return $n_num_rows;
+    return $n_id;
   }
 
   /**
@@ -647,7 +642,7 @@ class DBClass {
 	case 'mysql':
 	case 'mysqli':
 	default:
-	    $n_num_rows = mysqli_error($this->DBResource);
+	    $n_num_rows = mysqli_error($this->DBConnection);
 	    break;
     }
  
@@ -668,7 +663,7 @@ class DBClass {
    * @return boolean
    */
   public function dbDataSeek($rs, $location) {
-    return mysql_data_seek($rs, $location);
+    return mysqli_data_seek($rs, $location);
   }
 
   /**
@@ -677,7 +672,7 @@ class DBClass {
    * @return boolean
    */
   public function dbSeek($location) {
-    return mysql_data_seek($this->DBResource, $location);
+    return mysqli_data_seek($this->DBResource, $location);
   }
   
   /**
@@ -688,7 +683,7 @@ class DBClass {
    */
   public function dbResultToArray($rs, $sType = "assoc") {
     $aResult = array();
-    while($aRow = (($sType == "assoc") ? mysql_fetch_array($rs, MYSQL_ASSOC) : mysql_fetch_row($rs))) {
+    while($aRow = (($sType == "assoc") ? mysqli_fetch_array($rs, MYSQL_ASSOC) : mysqli_fetch_row($rs))) {
       $aResult[] = $aRow;
     }
     
@@ -704,12 +699,12 @@ class DBClass {
   public function dbResToArray($type) {
     $reRay = array();
     if (preg_match("%assoc%i", $type)) {
-      while ($row = mysql_fetch_assoc($this->DBResource)) {
+      while ($row = mysqli_fetch_assoc($this->DBResource)) {
 	array_push($reRay, $row);
       }
     }
     else {
-      while ($row = mysql_fetch_array($this->DBResource)) {
+      while ($row = mysqli_fetch_array($this->DBResource)) {
 	array_push($reRay, $row);
       }
     }
@@ -717,6 +712,14 @@ class DBClass {
     return $reRay;
   }
     
+  /**
+   * dbQuote - mysql quote a string
+   * @parameter ($value)
+   * @return string 
+   */
+  public function dbQuote($value) {
+      return mysqli_real_escape_string($this->DBConnection, $value);
+  }
 }
 
 ?>

@@ -173,7 +173,7 @@ class Model {
 	  $s_values .= ((!empty($s_values)) ? "', '" : '') . $s_value;
       }
       
-      $s_sql	= "INSERT INTO {$s_table} ({$s_columns} VALUES ('{$s_values}')";
+      $s_sql	= "INSERT INTO {$s_table} ({$s_columns}) VALUES ('{$s_values}')";
       $this->oDB->dbQuery($s_sql);
       return $this->oDB->dbGetInsertID();
   }
@@ -239,6 +239,26 @@ class Model {
 			((!empty($this->sOrderBy)) ? 'ORDER BY ' . $this->sOrderBy : '') . ' ' .
 			((!empty($this->sLimit)) ? 'LIMIT ' . $this->sLimit : '');
       return $s_sql;
+  }
+  
+  /**
+   * @access public
+   * quote - quote the sql value passed in
+   * @param $value
+   * @return string
+   */
+  public function quote($value) {
+      return $this->oDB->dbQuote($value);
+  }
+  
+  /**
+   * @access public
+   * get_table	- returns the table that this is associated with.
+   * @return type 
+   */
+  public function get_table()
+  {
+      return $this->sBaseTable;
   }
   
   /**
